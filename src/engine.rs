@@ -1371,9 +1371,26 @@ impl Reedline {
 
     fn handle_event(&mut self, prompt: &dyn Prompt, event: ReedlineEvent) -> Result<EventStatus> {
         if self.input_mode == InputMode::HistorySearch {
-            self.handle_history_search_event(event)
+            // Skua: Enter during a history search (Ctrl+R) runs the line it found, as bash's
+            // readline does, instead of only putting it into the prompt.
+            let submits = Self::is_submit_event(&event);
+            let status = self.handle_history_search_event(event)?;
+            if submits && self.input_mode == InputMode::Regular {
+                return self.handle_editor_event(prompt, ReedlineEvent::Submit);
+            }
+            Ok(status)
         } else {
             self.handle_editor_event(prompt, event)
+        }
+    }
+
+    /// Skua: an event that submits the line (`Enter`, `Submit`, `SubmitOrNewline`, also inside
+    /// an `UntilFound`).
+    fn is_submit_event(event: &ReedlineEvent) -> bool {
+        match event {
+            ReedlineEvent::Enter | ReedlineEvent::Submit | ReedlineEvent::SubmitOrNewline => true,
+            ReedlineEvent::UntilFound(events) => events.iter().any(Self::is_submit_event),
+            _ => false,
         }
     }
 
