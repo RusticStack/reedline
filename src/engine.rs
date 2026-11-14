@@ -4617,6 +4617,34 @@ mod tests {
         );
     }
 
+    /// Skua: Enter during a reverse history search runs the entry it found, as bash's
+    /// readline does, instead of only putting it into the prompt.
+    #[rstest]
+    #[case::enter(ReedlineEvent::Enter)]
+    #[case::submit(ReedlineEvent::Submit)]
+    #[case::submit_or_newline(ReedlineEvent::SubmitOrNewline)]
+    #[case::until_found(ReedlineEvent::UntilFound(vec![ReedlineEvent::Enter]))]
+    fn skua_enter_in_history_search_runs_the_line(#[case] enter: ReedlineEvent) {
+        let mut rl = seam_engine(Box::<crate::Emacs>::default());
+        rl.history
+            .save(HistoryItem::from_command_line("echo found"))
+            .expect("history ok");
+        rl.enter_history_search();
+        for c in "fou".chars() {
+            rl.handle_history_search_event(ReedlineEvent::Edit(vec![EditCommand::InsertChar(c)]))
+                .expect("history search event handled");
+        }
+        assert_eq!(rl.input_mode, InputMode::HistorySearch);
+
+        let status = rl
+            .handle_event(&DefaultPrompt::default(), enter)
+            .expect("enter handled");
+        assert!(
+            matches!(status, EventStatus::Exits(Signal::Success(ref s)) if s == "echo found"),
+            "one Enter runs the found entry"
+        );
+    }
+
     /// An auto-pairing engine with a history menu open in `mode`, over the
     /// buffer `setup` leaves behind.
     fn auto_pair_engine_with_open_menu(mode: crate::InputMode, setup: &[EditCommand]) -> Reedline {

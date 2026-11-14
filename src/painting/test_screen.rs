@@ -27,6 +27,11 @@ const SCROLLBACK: usize = 1000;
 const BEGIN_FRAME: &[u8] = b"\x1b[?2026h";
 const END_FRAME: &[u8] = b"\x1b[?2026l";
 
+/// vt100 0.18 takes the screen size as `NonZeroU16`; a zero size is a test bug.
+fn non_zero(n: u16) -> std::num::NonZeroU16 {
+    std::num::NonZeroU16::new(n).expect("test screen sizes are non-zero")
+}
+
 pub(crate) struct TestScreen {
     parser: vt100::Parser,
     /// How much of the painter's capture has been fed already, so
@@ -39,7 +44,7 @@ pub(crate) struct TestScreen {
 impl TestScreen {
     pub(crate) fn new(width: u16, height: u16) -> Self {
         Self {
-            parser: vt100::Parser::new(height, width, SCROLLBACK),
+            parser: vt100::Parser::new(non_zero(height), non_zero(width), SCROLLBACK),
             consumed: 0,
             frame_open: false,
         }
@@ -86,7 +91,7 @@ impl TestScreen {
 
     /// Every visible row, trailing blanks trimmed.
     pub(crate) fn rows(&self) -> Vec<String> {
-        let (_, width) = self.parser.screen().size();
+        let width = self.parser.screen().size().1.get();
         self.parser
             .screen()
             .rows(0, width)
@@ -104,7 +109,7 @@ impl TestScreen {
     /// The cursor as a terminal reports it to a position query: a pending
     /// wrap reads as the last column, since the report has no column past it.
     pub(crate) fn reported_cursor(&self) -> (u16, u16) {
-        let (_, width) = self.parser.screen().size();
+        let width = self.parser.screen().size().1.get();
         let (column, row) = self.cursor();
         (column.min(width.saturating_sub(1)), row)
     }
@@ -113,7 +118,7 @@ impl TestScreen {
     /// blanks trimmed.
     pub(crate) fn scrollback_rows(&mut self) -> Vec<String> {
         let total = self.scrolled();
-        let (_, width) = self.parser.screen().size();
+        let width = self.parser.screen().size().1.get();
         let screen = self.parser.screen_mut();
         // With the view `offset` rows up, its top row is the one `offset`
         // rows above the screen.
