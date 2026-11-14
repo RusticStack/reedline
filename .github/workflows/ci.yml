@@ -15,7 +15,7 @@ jobs:
         rust:
           - stable
         # Define the feature sets that will be built here (for caching you define a separate name)
-        style: [bashisms, default, sqlite, basqlite, external_printer]
+        style: [bashisms, default, sqlite, basqlite, external_printer, system_clipboard]
         include:
           - style: bashisms
             flags: "--features bashisms"
@@ -27,6 +27,8 @@ jobs:
             flags: "--features sqlite"
           - style: basqlite
             flags: "--features bashisms,sqlite"
+          - style: system_clipboard
+            flags: "--features system_clipboard"
 
 
     runs-on: ${{ matrix.platform }}
@@ -67,6 +69,11 @@ jobs:
 
       - name: Doctests
         run: cargo test --doc ${{ matrix.flags }}
+
+      - name: Docs
+        run: cargo doc --no-deps ${{ matrix.flags }}
+        env:
+          RUSTDOCFLAGS: -D warnings
 
   # Guards the `rust-version` claim in Cargo.toml, compiling the library as a
   # consumer on the MSRV would. Kept as a CI job instead of a rust-toolchain.toml
